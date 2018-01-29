@@ -40,7 +40,7 @@ def build_LM(in_file):
                 ngram_index = ngrams_indexer[ngram]
                 models[label_index][ngram_index] = ngram_count
             models[label_index] = [ngram_count / len(ngrams_indexer) for ngram_count in models[label_index]]
-    return models
+    return (labels_indexer, ngrams_indexer, models)
 
 def test_LM(in_file, out_file, LM):
     """
@@ -51,6 +51,22 @@ def test_LM(in_file, out_file, LM):
     print "testing language models..."
     # This is an empty method
     # Pls implement your code in below
+    labels_indexer, ngrams_indexer, models = LM
+    with open(out_file, 'w') as g:
+        with open(in_file) as f:
+            for line in f:
+                probabilities = {label: 1 for label in labels_indexer} # probabilities[label] = probability
+                sentence = line.strip()
+                for i in range(len(sentence) - n):
+                    ngram = tuple([ch.lower() for ch in sentence[i:i+n]])
+                    if ngram not in ngrams_indexer:
+                        continue
+                    ngram_index = ngrams_indexer[ngram]
+                    for label, label_index in labels_indexer:
+                        ngram_probability = models[labels_indexer][ngram_index]
+                        probabilities[label] *= ngram_probability
+                label = max(probabilities, key=probabilities.get)
+                g.write('{label} {sentence}'.format(label, line))
 
 def usage():
     print "usage: " + sys.argv[0] + " -b input-file-for-building-LM -t input-file-for-testing-LM -o output-file"

@@ -3,6 +3,7 @@ import re
 import nltk
 import sys
 import getopt
+import math
 
 n = 4
 
@@ -75,7 +76,8 @@ def test_LM(in_file, out_file, LM):
                     # Retrieve probability based on label and n-gram
                     for label, label_index in labels_indexer.items():
                         ngram_probability = models[label_index][ngram_index]
-                        probabilities[label] *= ngram_probability
+                        if ngram_probability:
+                            probabilities[label] += math.log(ngram_probability)
                 label = max(probabilities, key=probabilities.get)
                 g.write('{label} {sentence}'.format(label=label, sentence=line))
 

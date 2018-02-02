@@ -5,7 +5,13 @@ import sys
 import getopt
 import math
 
-n = 4
+n = 4 # 4-grams
+k = 1 # For add-k smoothing
+add_start_end_token = True
+has_case_folding = True
+is_log_probability = True
+can_belong_to_unseen_label = True
+seen_label_threshold = -4 # If exceed label then label = unseen label
 
 def build_LM(in_file):
     """
@@ -13,8 +19,6 @@ def build_LM(in_file):
     each line in in_file contains a label and an URL separated by a tab(\t)
     """
     print('building language models...')
-    # This is an empty method
-    # Pls implement your code in below
 
     # Initialize data structures
     labels_indexer = {} # indexer[label] = label_index
@@ -25,6 +29,8 @@ def build_LM(in_file):
     with open(in_file) as f:
         for line in f:
             label, sentence = line.strip().split(' ', 1)
+            if add_start_end_token:
+                sentence = '^' + sentence + '$'
             # If label not indexed, index it in the indexer and create a new row in the models list
             if label not in labels_indexer:
                 labels_indexer[label] = len(models)
@@ -32,7 +38,10 @@ def build_LM(in_file):
                 models.append([])
             # For each n-gram, lower the letter case, index the n-gram, and increment the n-gram count
             for i in range(len(sentence) - n):
-                ngram = tuple([ch.lower() for ch in sentence[i:i+n]])
+                if has_case_folding:
+                    ngram = tuple([ch.lower() for ch in sentence[i:i+n]])
+                else:
+                    ngram = tuple([ch for ch in sentence[i:i+n]])
                 if ngram not in ngrams_indexer:
                     ngrams_indexer[ngram] = ngrams_next_index
                     ngrams_next_index += 1
@@ -58,17 +67,16 @@ def test_LM(in_file, out_file, LM):
     you should print the most probable label for each URL into out_file
     """
     print('testing language models...')
-    # This is an empty method
-    # Pls implement your code in below
 
     labels_indexer, ngrams_indexer, models = LM
     with open(out_file, 'w') as g:
         with open(in_file) as f:
             for line in f:
                 # Initialize the probabilities for each label
-                probabilities = {label: 1 for label in labels_indexer} # probabilities[label] = probability
+                probabilities = {label: (0 if is_log_probability else 1) for label in labels_indexer} # probabilities[label] = probability
                 sentence = line.strip()
-                for i in range(len(sentence) - n):
+                num_ngrams = len(sentence) - n
+                for i in range(num_ngrams):
                     ngram = tuple([ch.lower() for ch in sentence[i:i+n]])
                     if ngram not in ngrams_indexer:
                         continue
@@ -76,9 +84,22 @@ def test_LM(in_file, out_file, LM):
                     # Retrieve probability based on label and n-gram
                     for label, label_index in labels_indexer.items():
                         ngram_probability = models[label_index][ngram_index]
-                        if ngram_probability:
+                        if is_log_probability and ngram_probability:
                             probabilities[label] += math.log(ngram_probability)
+                        else:
+                            # 1. Multiply probabilities regardless of zero probability
+                            # probabilities[label] *= ngram_probability
+
+                            # 2. Multiply non-zero probabilities
+                            # '''
+                            if ngram_probability:
+                                probabilities[label] *= ngram_probability
+                            # '''
                 label = max(probabilities, key=probabilities.get)
+                if can_belong_to_unseen_label:
+                    probabilities = { label: probability / num_ngrams for (label, probability) in probabilities.items() }
+                    if max(probabilities.values()) > seen_label_threshold:
+                        label = 'other'
                 g.write('{label} {sentence}'.format(label=label, sentence=line))
 
 def usage():
